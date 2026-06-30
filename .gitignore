@@ -1,0 +1,11 @@
+# Ignore Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore local virtual environments 
+venv/
+.venv/
+env/
+
+# Ignore python cache
+__pycache__/
+*.pyc
