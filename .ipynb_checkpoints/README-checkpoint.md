@@ -1,1 +1,0 @@
-# IDX-Exchange-California-Property-Close-Price-Prediction
