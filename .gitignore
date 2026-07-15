@@ -11,16 +11,12 @@ __pycache__/
 *.pyc
 
 # Ignore Larger files
-CMRLSData/
-CMRLSCleaned/
-CMRLSCleaned/
+CRMLSData/
+CRMLSCleaned/
 DistrictAreas2425/
 
 HemetFallbackArtifact.csv
-
-
 geocode_checkpoints/
-
 geocoded_output/
 
 scripts/
