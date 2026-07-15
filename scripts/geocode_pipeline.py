@@ -63,7 +63,7 @@ SCOPE_FILTER = {
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 
-geolocator = Nominatim(user_agent=USER_AGENT, timeout=10) # type: ignore
+geolocator = Nominatim(user_agent=USER_AGENT, timeout=10)
 geocode_fn = RateLimiter(geolocator.geocode, min_delay_seconds=1, max_retries=3, error_wait_seconds=10)
 
 # filename patterns
@@ -112,7 +112,7 @@ def classify_files(data_dir):
 
 def fix_mojibake(df):
     """Attempt to reverse UTF-8-decoded-as-Latin-1 corruption on all text columns."""
-    for col in df.select_dtypes(include="object").columns:
+    for col in df.select_dtypes(include=["object", "string"]).columns:
         def try_fix(val):
             if not isinstance(val, str):
                 return val
@@ -130,6 +130,18 @@ def filter_scope(df):
     for col, val in SCOPE_FILTER.items():
         mask &= (df[col] == val)
     return df[mask].copy()
+
+
+def valid_coord(lat, lon):
+    """Basic sanity check -- catches swapped lat/lon, placeholder junk (e.g. 0,0 or
+    999), and anything outside physically possible ranges before it reaches geopy."""
+    if pd.isna(lat) or pd.isna(lon):
+        return False
+    try:
+        lat, lon = float(lat), float(lon)
+    except (TypeError, ValueError):
+        return False
+    return -90 <= lat <= 90 and -180 <= lon <= 180
 
 
 def geocode_and_validate(df, checkpoint_path):
@@ -170,9 +182,23 @@ def geocode_and_validate(df, checkpoint_path):
             continue  # not added to results -> stays "to do" for next run
 
         if geocoded_lat is not None:
-            if pd.notna(orig_lat) and pd.notna(orig_lon):
-                dist = geodesic((orig_lat, orig_lon), (geocoded_lat, geocoded_lon)).km
-                status = "original_confirmed" if dist <= DISCREPANCY_THRESHOLD_KM else "original_discrepancy"
+            geocoded_ok = valid_coord(geocoded_lat, geocoded_lon)
+            original_ok = valid_coord(orig_lat, orig_lon)
+
+            if original_ok and geocoded_ok:
+                try:
+                    dist = geodesic((orig_lat, orig_lon), (geocoded_lat, geocoded_lon)).km
+                    status = "original_confirmed" if dist <= DISCREPANCY_THRESHOLD_KM else "original_discrepancy"
+                except ValueError as e:
+                    # belt-and-suspenders: shouldn't hit this given valid_coord above,
+                    # but never let one bad row take down the whole run.
+                    print(f"    distance calc failed for '{address}' ({orig_lat}, {orig_lon}) "
+                          f"vs ({geocoded_lat}, {geocoded_lon}): {e}")
+                    status = "distance_calc_error"
+            elif not original_ok and pd.notna(orig_lat) and pd.notna(orig_lon):
+                # there WAS an original coordinate, it's just garbage (out of range,
+                # likely swapped lat/lon) -- flag it distinctly so it's easy to find
+                status = "original_invalid_geocoded_used"
             else:
                 status = "filled_from_geocode"
 
