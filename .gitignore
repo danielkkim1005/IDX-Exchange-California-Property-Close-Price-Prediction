@@ -13,3 +13,12 @@ __pycache__/
 # Ignore Larger files
 CMRLSData/
 DistrictAreas2425/
+
+HemetFallbackArtifact.csv
+
+
+geocode_checkpoints/
+
+geocoded_output/
+
+scripts/
