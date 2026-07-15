@@ -12,6 +12,7 @@ __pycache__/
 
 # Ignore Larger files
 CMRLSData/
+CMRLSCleaned/
 DistrictAreas2425/
 
 HemetFallbackArtifact.csv
