@@ -14,12 +14,3 @@ __pycache__/
 CMRLSData/
 CMRLSCleaned/
 DistrictAreas2425/
-
-HemetFallbackArtifact.csv
-
-
-geocode_checkpoints/
-
-geocoded_output/
-
-scripts/
