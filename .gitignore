@@ -1,7 +1,7 @@
 # Ignore Jupyter notebook checkpoints
 .ipynb_checkpoints/
 
-# Ignore local virtual environments 
+# Ignore local virtual environments
 venv/
 .venv/
 env/
@@ -10,13 +10,22 @@ env/
 __pycache__/
 *.pyc
 
-# Ignore Larger files
+# Ignore large data / generated folders
 CRMLSData/
 CRMLSCleaned/
 DistrictAreas2425/
-
-HemetFallbackArtifact.csv
 geocode_checkpoints/
 geocoded_output/
+HemetFallbackArtifact.csv
 
-scripts/
+# Ignore backup/local git repos (fixed: this lives at repo root, not inside scripts/)
+repo-backup.git/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+models/rf_m3.pkl
+models/rf_m4.pkl
