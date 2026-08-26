@@ -1,0 +1,14 @@
+# Pinned to the exact versions used to train and pickle models/lgbm_m5.pkl
+# (see wk10_domain_features.ipynb). Version drift here is not cosmetic --
+# earlier in this project a sklearn version mismatch silently changed
+# TargetEncoder behavior and a shapely/geopandas mismatch caused a 30+
+# minute sjoin hang on a teammate's machine. Pin exactly; don't loosen
+# these without re-validating the pickle loads and predicts identically.
+streamlit==1.62.0
+scikit-learn==1.8.0
+xgboost==3.2.0
+lightgbm==4.7.0
+pandas==3.0.2
+numpy==2.4.4
+joblib==1.5.3
+geopy==2.5.0
