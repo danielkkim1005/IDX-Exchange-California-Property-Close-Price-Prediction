@@ -1,4 +1,4 @@
-# IDX Exchange — California Property Close-Price Prediction
+# IDX Exchange — California Property Price Prediction
 
 Predicts the final sale price (`ClosePrice`) of California single-family residential
 properties from CRMLS/Trestle MLS sold-listing data. Built over an IDX Exchange Data
