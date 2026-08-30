@@ -30,6 +30,7 @@ before predict() is ever called.
 
 import json
 import os
+import time
 
 import joblib
 import numpy as np
@@ -132,7 +133,13 @@ def _geocode_google(address, api_key):
 def _geocode_nominatim(address):
     """Nominatim (OpenStreetMap) via geopy -- free, no API key required.
     Used automatically whenever no Google Maps key is configured, and kept
-    as the always-available fallback either way."""
+    as the always-available fallback either way.
+
+    Retries once on HTTP 429 specifically. Nominatim's free-tier usage policy
+    caps clients to roughly 1 request/second per IP; a 429 there means the
+    server actively refused the request (not that it was slow), so a longer
+    `timeout` would do nothing -- a short backoff-and-retry is the actual fix
+    for a rate-limit that's often transient."""
     try:
         from geopy.exc import GeocoderServiceError, GeocoderTimedOut
         from geopy.geocoders import Nominatim
@@ -140,10 +147,23 @@ def _geocode_nominatim(address):
         return None, "geopy is not installed (see requirements.txt)."
 
     geolocator = Nominatim(user_agent="caproppredictor-streamlit-app", timeout=10)
-    try:
-        location = geolocator.geocode(address, addressdetails=True, country_codes="us")
-    except (GeocoderServiceError, GeocoderTimedOut) as exc:
-        return None, f"geocoding service error: {exc}"
+
+    last_exc = None
+    for attempt in range(2):
+        try:
+            location = geolocator.geocode(address, addressdetails=True, country_codes="us")
+            last_exc = None
+            break
+        except GeocoderServiceError as exc:
+            last_exc = exc
+            if "429" not in str(exc) or attempt == 1:
+                return None, f"geocoding service error: {exc}"
+            time.sleep(1.5)  # back off past Nominatim's ~1 req/sec window, then retry once
+        except GeocoderTimedOut as exc:
+            return None, f"geocoding service error: {exc}"
+
+    if last_exc is not None:
+        return None, f"geocoding service error: {last_exc}"
 
     if location is None:
         return None, "address not found"
