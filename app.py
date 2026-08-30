@@ -172,13 +172,21 @@ def geocode_address(address):
     Returns (result_dict_or_None, error_message_or_None).
     """
     api_key = _get_google_maps_api_key()
-    if api_key:
-        result, err = _geocode_google(address, api_key)
-        if result is not None:
-            return result, None
-        # fall through to Nominatim rather than failing outright on a
-        # transient Google error (quota hit, network blip, bad key, etc.)
-    return _geocode_nominatim(address)
+    if not api_key:
+        return _geocode_nominatim(address)
+
+    result, google_err = _geocode_google(address, api_key)
+    if result is not None:
+        return result, None
+
+    # Fall through to Nominatim rather than failing outright on a transient
+    # Google error (quota hit, network blip, bad key, etc.) -- but don't
+    # discard *why* Google failed, or the only error the user ever sees is
+    # whichever one Nominatim produces, which hides the real root cause.
+    fallback_result, nominatim_err = _geocode_nominatim(address)
+    if fallback_result is not None:
+        return fallback_result, None
+    return None, f"Google: {google_err} | Nominatim fallback: {nominatim_err}"
 
 
 def haversine_miles(lat1, lon1, lat2, lon2):
