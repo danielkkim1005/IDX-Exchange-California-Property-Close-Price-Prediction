@@ -29,3 +29,7 @@ Thumbs.db
 
 models/rf_m3.pkl
 models/rf_m4.pkl
+models/rf_m5.pkl
+
+# Streamlit secrets (API keys) -- local-only, never commit
+.streamlit/secrets.toml

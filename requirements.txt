@@ -12,3 +12,4 @@ pandas==3.0.2
 numpy==2.4.4
 joblib==1.5.3
 geopy==2.5.0
+requests==2.33.1

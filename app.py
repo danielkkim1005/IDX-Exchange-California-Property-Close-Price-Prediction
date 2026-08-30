@@ -80,17 +80,59 @@ FEATURE_COLUMNS = NUMERIC_MEDIAN_COLUMNS + NUMERIC_ZERO_FILL_COLUMNS + CATEGORIC
 MODEL_METRICS = {"r2": 0.9094, "mae": 152550, "mape": 0.1155, "mdape": 0.0797}
 
 
-def geocode_address(address):
-    """Resolves a free-text address to lat/long (+ ZIP/city/county where the
-    geocoder reports them) using Nominatim (OpenStreetMap) via geopy -- free,
-    no API key required, unlike the Google Maps Geocoding API the tutorial's
-    reference app uses. This exists purely to save the user from typing
-    latitude/longitude by hand (per the tutorial's Version 2 motivation);
-    every field it fills stays editable, and geocoding failure never blocks
-    the manual-entry path below it.
+def _get_google_maps_api_key():
+    """Reads google_maps_api_key from Streamlit secrets, if configured.
+    Locally that's .streamlit/secrets.toml (gitignored -- never commit real
+    keys); on Streamlit Community Cloud it's set via the app's
+    Settings -> Secrets panel. Returns None (not an error) if unset, so the
+    app falls back to the free geocoder rather than breaking."""
+    try:
+        return st.secrets["google_maps_api_key"]
+    except Exception:
+        return None
 
-    Returns (result_dict_or_None, error_message_or_None).
-    """
+
+def _geocode_google(address, api_key):
+    """Google Maps Geocoding API -- the service the deployment tutorial
+    walks through. More accurate/reliable than Nominatim, but requires a
+    Google Cloud API key with billing enabled."""
+    import requests
+
+    try:
+        resp = requests.get(
+            "https://maps.googleapis.com/maps/api/geocode/json",
+            params={"address": address, "key": api_key, "region": "us"},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except requests.RequestException as exc:
+        return None, f"Google geocoding request failed: {exc}"
+
+    status = data.get("status")
+    if status != "OK":
+        detail = f": {data['error_message']}" if data.get("error_message") else ""
+        return None, f"Google geocoding returned '{status}'{detail}"
+
+    result = data["results"][0]
+    loc = result["geometry"]["location"]
+    # Google returns address parts as a flat list of {long_name, types: [...]}
+    # rather than a dict -- index by each component's primary type.
+    components = {c["types"][0]: c["long_name"] for c in result.get("address_components", []) if c.get("types")}
+
+    return {
+        "latitude": loc["lat"],
+        "longitude": loc["lng"],
+        "postal_code": components.get("postal_code"),
+        "city": components.get("locality") or components.get("sublocality") or components.get("postal_town"),
+        "county": components.get("administrative_area_level_2"),
+    }, None
+
+
+def _geocode_nominatim(address):
+    """Nominatim (OpenStreetMap) via geopy -- free, no API key required.
+    Used automatically whenever no Google Maps key is configured, and kept
+    as the always-available fallback either way."""
     try:
         from geopy.exc import GeocoderServiceError, GeocoderTimedOut
         from geopy.geocoders import Nominatim
@@ -107,14 +149,36 @@ def geocode_address(address):
         return None, "address not found"
 
     addr = location.raw.get("address", {})
-    result = {
+    return {
         "latitude": location.latitude,
         "longitude": location.longitude,
         "postal_code": addr.get("postcode"),
         "city": addr.get("city") or addr.get("town") or addr.get("village"),
         "county": addr.get("county"),
-    }
-    return result, None
+    }, None
+
+
+def geocode_address(address):
+    """Resolves a free-text address to lat/long (+ ZIP/city/county where the
+    geocoder reports them). Uses the Google Maps Geocoding API when
+    `google_maps_api_key` is configured in Streamlit secrets (see
+    _get_google_maps_api_key), otherwise falls back to the free Nominatim
+    (OpenStreetMap) geocoder -- so the app works with zero setup, and gets
+    more accurate/reliable once a key is added. This exists purely to save
+    the user from typing latitude/longitude by hand (per the deployment
+    tutorial's Version 2 motivation); every field it fills stays editable,
+    and geocoding failure never blocks the manual-entry path below it.
+
+    Returns (result_dict_or_None, error_message_or_None).
+    """
+    api_key = _get_google_maps_api_key()
+    if api_key:
+        result, err = _geocode_google(address, api_key)
+        if result is not None:
+            return result, None
+        # fall through to Nominatim rather than failing outright on a
+        # transient Google error (quota hit, network blip, bad key, etc.)
+    return _geocode_nominatim(address)
 
 
 def haversine_miles(lat1, lon1, lat2, lon2):
